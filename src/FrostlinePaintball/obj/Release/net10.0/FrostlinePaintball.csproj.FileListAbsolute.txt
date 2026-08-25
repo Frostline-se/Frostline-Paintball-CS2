@@ -1,0 +1,13 @@
+C:\Users\noahc\OneDrive\Dokument\GitHub\Frostline-commits\alla servrar\Frostline-Paintball-CS2\src\FrostlinePaintball\bin\Release\net10.0\FrostlinePaintball.deps.json
+C:\Users\noahc\OneDrive\Dokument\GitHub\Frostline-commits\alla servrar\Frostline-Paintball-CS2\src\FrostlinePaintball\bin\Release\net10.0\FrostlinePaintball.dll
+C:\Users\noahc\OneDrive\Dokument\GitHub\Frostline-commits\alla servrar\Frostline-Paintball-CS2\src\FrostlinePaintball\bin\Release\net10.0\FrostlinePaintball.pdb
+C:\Users\noahc\OneDrive\Dokument\GitHub\Frostline-commits\alla servrar\Frostline-Paintball-CS2\src\FrostlinePaintball\obj\Release\net10.0\FrostlinePaintball.csproj.AssemblyReference.cache
+C:\Users\noahc\OneDrive\Dokument\GitHub\Frostline-commits\alla servrar\Frostline-Paintball-CS2\src\FrostlinePaintball\obj\Release\net10.0\FrostlinePaintball.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\noahc\OneDrive\Dokument\GitHub\Frostline-commits\alla servrar\Frostline-Paintball-CS2\src\FrostlinePaintball\obj\Release\net10.0\FrostlinePaintball.AssemblyInfoInputs.cache
+C:\Users\noahc\OneDrive\Dokument\GitHub\Frostline-commits\alla servrar\Frostline-Paintball-CS2\src\FrostlinePaintball\obj\Release\net10.0\FrostlinePaintball.AssemblyInfo.cs
+C:\Users\noahc\OneDrive\Dokument\GitHub\Frostline-commits\alla servrar\Frostline-Paintball-CS2\src\FrostlinePaintball\obj\Release\net10.0\FrostlinePaintball.csproj.CoreCompileInputs.cache
+C:\Users\noahc\OneDrive\Dokument\GitHub\Frostline-commits\alla servrar\Frostline-Paintball-CS2\src\FrostlinePaintball\obj\Release\net10.0\FrostlinePaintball.sourcelink.json
+C:\Users\noahc\OneDrive\Dokument\GitHub\Frostline-commits\alla servrar\Frostline-Paintball-CS2\src\FrostlinePaintball\obj\Release\net10.0\FrostlinePaintball.dll
+C:\Users\noahc\OneDrive\Dokument\GitHub\Frostline-commits\alla servrar\Frostline-Paintball-CS2\src\FrostlinePaintball\obj\Release\net10.0\refint\FrostlinePaintball.dll
+C:\Users\noahc\OneDrive\Dokument\GitHub\Frostline-commits\alla servrar\Frostline-Paintball-CS2\src\FrostlinePaintball\obj\Release\net10.0\FrostlinePaintball.pdb
+C:\Users\noahc\OneDrive\Dokument\GitHub\Frostline-commits\alla servrar\Frostline-Paintball-CS2\src\FrostlinePaintball\obj\Release\net10.0\ref\FrostlinePaintball.dll

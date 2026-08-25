@@ -1,0 +1,12 @@
+Layer0
+{
+    shader "csgo_projected_decals.vfx"
+    F_ALPHA_MODE "1"
+    g_bFogEnabled "1"
+    g_flAlphaCutoffSoftness "0.671"
+    g_flDecalZAlphaScale "0.01"
+    TextureColor "[0.482353 0.407843 0.933333 0.000000]"
+    TextureMetalness "[0.000000 0.000000 0.000000 0.000000]"
+    TextureAmbientOcclusion "[1.000000 1.000000 1.000000 1.000000]"
+    TextureTranslucency "materials/frostline_paintball/paint_splat.png"
+}
