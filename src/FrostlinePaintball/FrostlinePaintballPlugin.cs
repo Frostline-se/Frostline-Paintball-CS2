@@ -17,8 +17,8 @@ namespace FrostlinePaintball;
 [PluginMetadata(
     Id = "frostline.paintball",
     Name = "Frostline Paintball",
-    Version = "1.1.0",
-    Author = "Frostline",
+    Version = "S2.1.1.0",
+    Author = "Frostline Port by Low",
     Description = "Colored paint splats on CS2 bullet impacts.",
     MinimumAPIVersion = "1.4.0")]
 public sealed class FrostlinePaintballPlugin : BasePlugin
