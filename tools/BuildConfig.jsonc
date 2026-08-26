@@ -1,0 +1,33 @@
+// Local build/tooling directories for Frostline Paintball.
+//
+// Edit the values below to match your own machine instead of editing
+// Compile-Assets.ps1 / Build-PluginRelease.ps1 directly. Every value here can
+// still be overridden per-run with the matching -Param on either script;
+// precedence is: command-line param > this file > built-in fallback.
+//
+// All paths are relative to the project root unless noted otherwise.
+{
+  // Root of your CS2 install, i.e. the folder that directly contains
+  // "content\csgo_addons\..." and "game\bin\win64\resourcecompiler.exe".
+  // Leave empty to require -Cs2Root on the command line (this is the current/default behavior).
+  "Cs2Root": "I:/SteamLibrary/steamapps/common/Counter-Strike Global Offensive",
+
+  // Name of the Source 2 workshop addon that holds the compiled paint materials.
+  "AddonName": "fsassets",
+
+  // Folder name the plugin ships under. CounterStrikeSharp loads plugins from
+  // "<game>\addons\counterstrikesharp\plugins\<PluginFolderName>\<PluginFolderName>.dll",
+  // so this must match the compiled assembly name (see AssemblyName in the .csproj).
+  "PluginFolderName": "FrostlinePaintball",
+
+  // Directory (relative to the project root) that collects all build output
+  // before you copy it to a real server.
+  "ReleaseDir": "release",
+
+  // Path under ReleaseDir where the ready-to-copy CounterStrikeSharp plugin folder is written.
+  // Mirrors a real server's layout: server\addons\counterstrikesharp\plugins\<PluginFolderName>.
+  "ReleasePluginParentSubdir": "server/addons/counterstrikesharp/plugins",
+
+  // Path under ReleaseDir where compiled workshop addon content is collected.
+  "ReleaseWorkshopSubdir": "workshop-addon"
+}
