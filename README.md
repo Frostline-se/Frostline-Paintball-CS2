@@ -84,27 +84,60 @@ Set `MinSize` and `MaxSize` to the same value if every paint splat should have a
 
 Decals are removed at the start of each round by default. If more than `MaxActiveDecals` impacts exist during a round, the oldest decal is removed whenever a new one is created.
 
+## Configuring build paths
+
+Both build scripts in `tools/` read their settings from `tools/BuildConfig.jsonc`, so you can set your local paths once instead of passing command-line switches every time. Open that file and edit the values to match your machine:
+
+| Setting | Default | Description |
+| --- | --- | --- |
+| `Cs2Root` | *(empty)* | Root of your CS2 install — the folder that directly contains `content\csgo_addons\...` and `game\bin\win64\resourcecompiler.exe`. Required for `Compile-Assets.ps1`; leave empty to require `-Cs2Root` on the command line instead. |
+| `AddonName` | `frostline_paintball_assets` | Name of the local Workshop Tools addon that holds the compiled paint materials. |
+| `PluginFolderName` | `FrostlinePaintball` | Folder name the plugin ships under. Must match the compiled assembly name (`AssemblyName` in the `.csproj`), since CounterStrikeSharp loads plugins from `addons\counterstrikesharp\plugins\<PluginFolderName>\<PluginFolderName>.dll`. |
+| `ReleaseDir` | `release` | Directory (relative to the project root, unless you give an absolute path) that collects all build output before you copy it to a real server. |
+| `ReleasePluginParentSubdir` | `server/addons/counterstrikesharp/plugins` | Path under `ReleaseDir` where the ready-to-copy plugin folder is written. |
+| `ReleaseWorkshopSubdir` | `workshop-addon` | Path under `ReleaseDir` where compiled workshop addon content is collected. |
+
+Every setting can also be overridden per-run with a matching command-line parameter. Precedence is: **command-line param > `BuildConfig.jsonc` > built-in default**. For example, to build against a different CS2 install just for one run without touching the config file:
+
+```powershell
+.\tools\Compile-Assets.ps1 -Cs2Root "G:\SteamLibrary\steamapps\common\Counter-Strike Global Offensive"
+```
+
+You can also point either script at a completely different config file with `-ConfigPath`:
+
+```powershell
+.\tools\Build-PluginRelease.ps1 -ConfigPath "C:\configs\BuildConfig.dev.jsonc"
+```
+
+`Cs2Root` is the only setting that must be provided one way or another (config file or `-Cs2Root`); everything else already has a working default.
+
 ## Building the plugin
 
 ```powershell
 .\tools\Build-PluginRelease.ps1
 ```
 
-The deployable plugin is written to:
+This runs `dotnet build` for `src/FrostlinePaintball/FrostlinePaintball.csproj` and copies the compiled `.dll`, `.deps.json` and `.pdb` into the release plugin folder. Pass `-Configuration Debug` to build a Debug build instead of the default `Release`.
+
+The deployable plugin is written to (using the default config):
 
 ```text
 release/server/addons/counterstrikesharp/plugins/FrostlinePaintball/
 ```
+
+If you change `ReleaseDir` or `ReleasePluginParentSubdir` in `BuildConfig.jsonc`, the output moves accordingly.
 
 ## Building the Source 2 materials
 
 Install the Counter-Strike 2 Workshop Tools and run:
 
 ```powershell
-.\tools\Compile-Assets.ps1 -Cs2Root "G:\SteamLibrary\steamapps\common\Counter-Strike Global Offensive"
+.\tools\Compile-Assets.ps1
 ```
 
-The script creates a local Workshop Tools addon named `frostline_paintball_assets` and places a portable compiled copy in `release/workshop-addon`.
+(or pass `-Cs2Root` directly if you haven't set it in `BuildConfig.jsonc`, as shown above).
+
+The script creates a local Workshop Tools addon (named `AddonName` from the config, `frostline_paintball_assets` by default) and places a portable compiled copy in `release/workshop-addon` (or wherever `ReleaseDir`/`ReleaseWorkshopSubdir` point). Re-running the script only adds and overwrites the compiled materials it produces — it won't delete other files you've placed in the addon or release folders.
 
 ## Troubleshooting
 
