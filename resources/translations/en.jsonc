@@ -1,0 +1,11 @@
+// Frostline Paintball - English translations
+// File location follows SwiftlyS2 convention: resources/translations/<lang>.jsonc
+// See: https://swiftlys2.net/docs/guides/porting-from-css/#translations
+//
+// Usage in code:
+//   Core.Localizer["key"]
+//   Core.Localizer["key", arg1, arg2]
+{
+  "frostline_paintball.errors.decal_create_failed": "Frostline Paintball failed to create an env_decal.",
+  "frostline_paintball.errors.decal_spawn_failed": "Frostline Paintball failed to spawn an env_decal."
+}
