@@ -22,7 +22,7 @@ public sealed class FrostlinePaintballPlugin : BasePlugin, IPluginConfig<Paintba
     private bool _spawnErrorLogged;
 
     public override string ModuleName => "Frostline Paintball";
-    public override string ModuleVersion => "1.1.0";
+    public override string ModuleVersion => "1.1.1";
     public override string ModuleAuthor => "Frostline";
     public override string ModuleDescription => "Colored paint splats on CS2 bullet impacts.";
 
