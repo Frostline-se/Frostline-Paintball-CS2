@@ -1,52 +1,80 @@
-using CounterStrikeSharp.API;
-using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Core.Attributes;
-using CounterStrikeSharp.API.Modules.Utils;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Primitives;
+using SwiftlyS2.Shared;
+using SwiftlyS2.Shared.EntitySystem;
+using SwiftlyS2.Shared.Events;
+using SwiftlyS2.Shared.GameEventDefinitions;
+using SwiftlyS2.Shared.GameEvents;
+using SwiftlyS2.Shared.Misc;
+using SwiftlyS2.Shared.Natives;
+using SwiftlyS2.Shared.Plugins;
+using SwiftlyS2.Shared.SchemaDefinitions;
+using SwiftlyS2.Shared.Trace;
 
 namespace FrostlinePaintball;
 
-[MinimumApiVersion(372)]
-public sealed class FrostlinePaintballPlugin : BasePlugin, IPluginConfig<PaintballConfig>
+[PluginMetadata(
+    Id = "frostline.paintball",
+    Name = "Frostline Paintball",
+    Version = "1.1.0",
+    Author = "Frostline",
+    Description = "Colored paint splats on CS2 bullet impacts.",
+    MinimumAPIVersion = "1.4.0")]
+public sealed class FrostlinePaintballPlugin : BasePlugin
 {
+    private const string ConfigFileName = "frostline_paintball.jsonc";
+    private const string ConfigSection = "FrostlinePaintball";
+
     private const float RadiansToDegrees = 180.0f / MathF.PI;
     private const float SurfaceTraceHalfLength = 16.0f;
 
-    private static readonly TraceOptions SurfaceTraceOptions = new()
-    {
-        InteractsWith = Masks.ShotBrushOnly
-    };
+    // SwiftlyS2 doesn't expose CounterStrikeSharp's `Masks.ShotBrushOnly` preset, so this
+    // approximates it: solid world geometry plus the surface types a bullet can still leave
+    // a mark on (windows/glass, breakable debris), while leaving Hitbox out of the mask so
+    // player models are never treated as a paintable surface.
+    private static readonly MaskTrace SurfaceTraceMask = MaskTrace.Solid | MaskTrace.Window | MaskTrace.Debris;
 
     private readonly Queue<CEnvDecal> _activeDecals = new();
     private readonly List<PaintColor> _enabledColors = [];
     private bool _spawnErrorLogged;
+    private IDisposable? _configChangeSubscription;
 
-    public override string ModuleName => "Frostline Paintball";
-    public override string ModuleVersion => "1.1.0";
-    public override string ModuleAuthor => "Frostline";
-    public override string ModuleDescription => "Colored paint splats on CS2 bullet impacts.";
+    public PaintballConfig Config { get; private set; } = new();
 
-    public PaintballConfig Config { get; set; } = new();
+    public FrostlinePaintballPlugin(ISwiftlyCore core) : base(core)
+    {
+    }
 
     public override void Load(bool hotReload)
     {
-        RefreshEnabledColors();
+        _ = Core.Configuration
+            .InitializeJsonWithModel<PaintballConfig>(ConfigFileName, ConfigSection)
+            .Configure(builder => builder.AddJsonFile(
+                Core.Configuration.GetConfigPath(ConfigFileName),
+                optional: false,
+                reloadOnChange: true));
 
-        RegisterListener<Listeners.OnServerPrecacheResources>(OnServerPrecacheResources);
-        RegisterEventHandler<EventBulletImpact>(OnBulletImpact);
-        RegisterEventHandler<EventRoundStart>(OnRoundStart);
+        LoadConfigFromManager();
+
+        // Mirrors CounterStrikeSharp's OnConfigParsed hot-reload behavior: whenever the
+        // config file changes on disk, re-bind, re-clamp and refresh the enabled color list.
+        _configChangeSubscription = ChangeToken.OnChange(
+            () => Core.Configuration.Manager.GetReloadToken(),
+            LoadConfigFromManager);
     }
 
-    public override void Unload(bool hotReload)
+    public override void Unload()
     {
-        RemoveListener<Listeners.OnServerPrecacheResources>(OnServerPrecacheResources);
-        DeregisterEventHandler<EventBulletImpact>(OnBulletImpact);
-        DeregisterEventHandler<EventRoundStart>(OnRoundStart);
+        _configChangeSubscription?.Dispose();
+        _configChangeSubscription = null;
         ClearDecals();
     }
 
-    public void OnConfigParsed(PaintballConfig config)
+    private void LoadConfigFromManager()
     {
+        var config = new PaintballConfig();
+        Core.Configuration.Manager.GetSection(ConfigSection).Bind(config);
         Config = config;
         NormalizeConfig();
         RefreshEnabledColors();
@@ -68,17 +96,20 @@ public sealed class FrostlinePaintballPlugin : BasePlugin, IPluginConfig<Paintba
             color.Enabled && !string.IsNullOrWhiteSpace(color.Material)));
     }
 
-    private void OnServerPrecacheResources(ResourceManifest manifest)
+    // Attribute-driven precache hook, equivalent to CSS's Listeners.OnServerPrecacheResources.
+    [EventListener<EventDelegates.OnPrecacheResource>]
+    public void OnPrecacheResource(IOnPrecacheResourceEvent @event)
     {
         foreach (var material in _enabledColors
                      .Select(color => color.Material)
                      .Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            manifest.AddResource(material);
+            @event.AddItem(material);
         }
     }
 
-    private HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
+    [GameEventHandler(HookMode.Post)]
+    public HookResult OnRoundStart(EventRoundStart @event)
     {
         _spawnErrorLogged = false;
 
@@ -90,20 +121,21 @@ public sealed class FrostlinePaintballPlugin : BasePlugin, IPluginConfig<Paintba
         return HookResult.Continue;
     }
 
-    private HookResult OnBulletImpact(EventBulletImpact @event, GameEventInfo info)
+    [GameEventHandler(HookMode.Post)]
+    public HookResult OnBulletImpact(EventBulletImpact @event)
     {
         if (!Config.Enabled || _enabledColors.Count == 0)
         {
             return HookResult.Continue;
         }
 
-        var player = @event.Userid;
-        if (player is null || !player.IsValid || (!Config.IncludeBots && player.IsBot))
+        var player = @event.UserIdPlayer;
+        if (player is null || !player.IsValid || (!Config.IncludeBots && player.ServerSideClient.FakePlayer))
         {
             return HookResult.Continue;
         }
 
-        var pawn = player.PlayerPawn.Value;
+        var pawn = @event.UserIdPawn;
         var origin = pawn?.AbsOrigin;
         var camera = pawn?.CameraServices;
 
@@ -112,7 +144,7 @@ public sealed class FrostlinePaintballPlugin : BasePlugin, IPluginConfig<Paintba
             return HookResult.Continue;
         }
 
-        var eyePosition = new Vector(origin.X, origin.Y, origin.Z + camera.OldPlayerViewOffsetZ);
+        var eyePosition = new Vector(origin.Value.X, origin.Value.Y, origin.Value.Z + camera.OldPlayerViewOffsetZ);
         var impactPosition = new Vector(@event.X, @event.Y, @event.Z);
 
         if (!TryGetProjection(pawn, eyePosition, impactPosition, out var decalPosition, out var decalAngles))
@@ -134,90 +166,95 @@ public sealed class FrostlinePaintballPlugin : BasePlugin, IPluginConfig<Paintba
         out Vector decalPosition,
         out QAngle decalAngles)
     {
-        var dx = impactPosition.X - eyePosition.X;
-        var dy = impactPosition.Y - eyePosition.Y;
-        var dz = impactPosition.Z - eyePosition.Z;
-        var length = MathF.Sqrt(dx * dx + dy * dy + dz * dz);
+        var toImpact = impactPosition - eyePosition;
+        var length = toImpact.Length();
 
         if (length < 0.001f)
         {
             decalPosition = impactPosition;
-            decalAngles = new QAngle(0.0f, 0.0f, 0.0f);
+            decalAngles = QAngle.Zero;
             return false;
         }
 
-        var directionX = dx / length;
-        var directionY = dy / length;
-        var directionZ = dz / length;
+        var direction = toImpact / length;
 
-        var traceStart = new Vector(
-            impactPosition.X - directionX * SurfaceTraceHalfLength,
-            impactPosition.Y - directionY * SurfaceTraceHalfLength,
-            impactPosition.Z - directionZ * SurfaceTraceHalfLength);
-        var traceEnd = new Vector(
-            impactPosition.X + directionX * SurfaceTraceHalfLength,
-            impactPosition.Y + directionY * SurfaceTraceHalfLength,
-            impactPosition.Z + directionZ * SurfaceTraceHalfLength);
-        var traceResult = Trace.TraceEndShape(traceStart, traceEnd, pawn, SurfaceTraceOptions);
+        var traceStart = impactPosition - direction * SurfaceTraceHalfLength;
+        var traceEnd = impactPosition + direction * SurfaceTraceHalfLength;
 
-        if (!traceResult.DidHit())
+        var traceParams = TraceParams.Builder()
+            .InteractWith(SurfaceTraceMask)
+            .IgnoreEntity(pawn)
+            .Build();
+
+        var traceResult = Core.Trace.TraceShapeLine(traceStart, traceEnd, traceParams);
+
+        if (!traceResult.DidHit)
         {
             decalPosition = impactPosition;
-            decalAngles = new QAngle(0.0f, 0.0f, 0.0f);
+            decalAngles = QAngle.Zero;
             return false;
         }
 
-        var surfacePosition = traceResult.HasExactHitPoint
-            ? traceResult.HitPoint
-            : traceResult.EndPos;
-        var normal = traceResult.Normal;
-        var normalLength = MathF.Sqrt(normal.X * normal.X + normal.Y * normal.Y + normal.Z * normal.Z);
+        var surfacePosition = traceResult.ExactHitPoint ? traceResult.HitPoint : traceResult.EndPos;
+        var normal = traceResult.HitNormal;
+        var normalLength = normal.Length();
 
         if (normalLength < 0.5f)
         {
             decalPosition = impactPosition;
-            decalAngles = new QAngle(0.0f, 0.0f, 0.0f);
+            decalAngles = QAngle.Zero;
             return false;
         }
 
-        var normalX = normal.X / normalLength;
-        var normalY = normal.Y / normalLength;
-        var normalZ = normal.Z / normalLength;
+        var unitNormal = normal / normalLength;
 
-        decalPosition = new Vector(
-            surfacePosition.X + normalX * Config.SurfaceOffset,
-            surfacePosition.Y + normalY * Config.SurfaceOffset,
-            surfacePosition.Z + normalZ * Config.SurfaceOffset);
+        decalPosition = surfacePosition + unitNormal * Config.SurfaceOffset;
 
-        var pitch = MathF.Acos(Math.Clamp(normalZ, -1.0f, 1.0f)) * RadiansToDegrees;
-        var yaw = MathF.Atan2(normalY, normalX) * RadiansToDegrees;
+        var pitch = MathF.Acos(Math.Clamp(unitNormal.Z, -1.0f, 1.0f)) * RadiansToDegrees;
+        var yaw = MathF.Atan2(unitNormal.Y, unitNormal.X) * RadiansToDegrees;
         decalAngles = new QAngle(pitch, yaw, 0.0f);
         return true;
     }
 
     private void SpawnDecal(Vector position, QAngle angles, float size, string material)
     {
-        var decal = Utilities.CreateEntityByName<CEnvDecal>("env_decal");
-        if (decal is null)
+        CEnvDecal decal;
+        try
         {
-            LogSpawnErrorOnce("CS2 did not create env_decal.");
+            // Unlike CSS's Utilities.CreateEntityByName, SwiftlyS2's CreateEntity<T>() throws
+            // instead of returning null when the entity can't be created.
+            decal = Core.EntitySystem.CreateEntity<CEnvDecal>();
+        }
+        catch (Exception exception)
+        {
+            LogSpawnErrorOnce(exception, "Frostline Paintball failed to create an env_decal.");
             return;
         }
 
         try
         {
             using var keyValues = new CEntityKeyValues();
-            keyValues.SetString("targetname", $"frostline_paint_{Server.TickCount}");
+            // SwiftlyS2 has no direct equivalent of CSS's Server.TickCount; a process-relative
+            // tick counter is enough to keep these targetnames unique.
+            keyValues.SetString("targetname", $"frostline_paint_{Environment.TickCount64}");
             keyValues.SetString("material", material);
 
             decal.Width = size;
+            decal.WidthUpdated();
             decal.Height = size;
+            decal.HeightUpdated();
             decal.Depth = Config.ProjectionDepth;
+            decal.DepthUpdated();
             decal.RenderOrder = Config.RenderOrder;
+            decal.RenderOrderUpdated();
             decal.RenderMode = RenderMode_t.kRenderNormal;
+            decal.RenderModeUpdated();
             decal.ProjectOnWorld = true;
+            decal.ProjectOnWorldUpdated();
             decal.ProjectOnCharacters = false;
+            decal.ProjectOnCharactersUpdated();
             decal.ProjectOnWater = false;
+            decal.ProjectOnWaterUpdated();
 
             decal.Teleport(position, angles, null);
             decal.DispatchSpawn(keyValues);
@@ -229,14 +266,10 @@ public sealed class FrostlinePaintballPlugin : BasePlugin, IPluginConfig<Paintba
         {
             if (decal.IsValid)
             {
-                decal.Remove();
+                decal.Despawn();
             }
 
-            if (!_spawnErrorLogged)
-            {
-                Logger.LogError(exception, "Frostline Paintball failed to spawn an env_decal.");
-                _spawnErrorLogged = true;
-            }
+            LogSpawnErrorOnce(exception, "Frostline Paintball failed to spawn an env_decal.");
         }
     }
 
@@ -260,18 +293,18 @@ public sealed class FrostlinePaintballPlugin : BasePlugin, IPluginConfig<Paintba
     {
         if (decal.IsValid)
         {
-            decal.Remove();
+            decal.Despawn();
         }
     }
 
-    private void LogSpawnErrorOnce(string message)
+    private void LogSpawnErrorOnce(Exception exception, string message)
     {
         if (_spawnErrorLogged)
         {
             return;
         }
 
-        Logger.LogError("{Message}", message);
+        Core.Logger.LogError(exception, "{Message}", message);
         _spawnErrorLogged = true;
     }
 }
