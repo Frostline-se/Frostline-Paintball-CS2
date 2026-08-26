@@ -1,8 +1,9 @@
-using CounterStrikeSharp.API.Core;
-
 namespace FrostlinePaintball;
 
-public sealed class PaintballConfig : BasePluginConfig
+// SwiftlyS2 configuration models are plain POCOs bound through the .NET Options
+// pattern (Microsoft.Extensions.Configuration), so there is no CounterStrikeSharp
+// `BasePluginConfig` base class to inherit from anymore.
+public sealed class PaintballConfig
 {
     public bool Enabled { get; set; } = true;
     public bool IncludeBots { get; set; } = true;
